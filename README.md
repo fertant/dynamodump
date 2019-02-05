@@ -13,6 +13,7 @@ Usage
 -----
 ```
 usage: dynamodump.py [-h] [-a {zip,tar}] [-b BUCKET]
+                     [-f {json,csv}] 
                      [-m {backup,restore,empty}] [-r REGION] [--host HOST]
                      [--port PORT] [--accessKey ACCESSKEY]
                      [--secretKey SECRETKEY] [-p PROFILE] [-s SRCTABLE]
@@ -29,6 +30,8 @@ optional arguments:
   -a {zip,tar}, --archive {zip,tar}
                         Type of compressed archive to create.If unset, don't
                         create archive
+  -f {json,csv}, --format {json,csv}
+                        Format for backup output json or transform to csv.
   -b BUCKET, --bucket BUCKET
                         S3 bucket in which to store or retrieve backups.[must
                         already exist]
