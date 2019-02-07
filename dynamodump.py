@@ -11,6 +11,7 @@
 import argparse
 import fnmatch
 import json
+import csv
 import logging
 import os
 import shutil
@@ -530,7 +531,7 @@ def do_empty(dynamo, table_name):
         datetime.datetime.now().replace(microsecond=0) - start_time))
 
 
-def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
+def do_backup(dynamo, read_capacity, format, tableQueue=None, srcTable=None):
     """
     Connect to DynamoDB and perform the backup for srcTable or each table in tableQueue
     """
@@ -585,12 +586,9 @@ def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
                                       table_name + ".  BACKUP FOR IT IS USELESS.")
                         tableQueue.task_done()
 
-                    f = open(
+                    save_table_data_to_file(
                         args.dumpPath + os.sep + table_name + os.sep + DATA_DIR + os.sep +
-                        str(i).zfill(4) + ".json", "w+"
-                    )
-                    f.write(json.dumps(scanned_table, indent=JSON_INDENT))
-                    f.close()
+                        str(i).zfill(4), args.format, scanned_table)
 
                     i += 1
 
@@ -612,6 +610,30 @@ def do_backup(dynamo, read_capacity, tableQueue=None, srcTable=None):
 
             tableQueue.task_done()
 
+def save_table_data_to_file(path, format, scanned_table):
+    """
+    Save DynamoDB data to file
+    """
+    if format == "json":
+        f = open(path + "." + format, "w+")
+        f.write(json.dumps(scanned_table, indent=JSON_INDENT))
+        f.close()
+    if format == "csv":
+        f = open(path + "." + format, "w+")
+        output = csv.writer(f)
+        header = scanned_table['Items'][0].keys()
+        output.writerow(header)
+
+        for item in scanned_table['Items']:
+            data = []
+            for element in header:
+                if 'SS' in item[element]:
+                    data.append(";".join(item[element]['SS']))
+                else:
+                    data.append(item[element].values().pop())
+            output.writerow([unicode(s).encode("utf-8") for s in data])
+
+        f.close()
 
 def do_restore(dynamo, sleep_interval, source_table, destination_table, write_capacity):
     """
@@ -804,6 +826,8 @@ def main():
                         "If unset, don't create archive", choices=["zip", "tar"])
     parser.add_argument("-b", "--bucket", help="S3 bucket in which to store or retrieve backups."
                         "[must already exist]")
+    parser.add_argument("-f", "--format", help="File format for data saving to S3 bucket.",
+                        choices=["csv", "json"], default="json")
     parser.add_argument("-m", "--mode", help="Operation to perform",
                         choices=["backup", "restore", "empty"])
     parser.add_argument("-r", "--region", help="AWS region to use, e.g. 'us-west-1'. "
@@ -917,9 +941,9 @@ def main():
 
         try:
             if args.srcTable.find("*") == -1:
-                do_backup(conn, args.read_capacity, tableQueue=None)
+                do_backup(conn, args.read_capacity, args.format, tableQueue=None)
             else:
-                do_backup(conn, args.read_capacity, matching_backup_tables)
+                do_backup(conn, args.read_capacity, args.format, matching_backup_tables)
         except AttributeError:
             # Didn't specify srcTable if we get here
 
@@ -927,7 +951,7 @@ def main():
             threads = []
 
             for i in range(MAX_NUMBER_BACKUP_WORKERS):
-                t = threading.Thread(target=do_backup, args=(conn, args.readCapacity),
+                t = threading.Thread(target=do_backup, args=(conn, args.readCapacity, args.format),
                                      kwargs={"tableQueue": q})
                 t.start()
                 threads.append(t)

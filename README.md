@@ -32,6 +32,7 @@ optional arguments:
                         create archive
   -f {json,csv}, --format {json,csv}
                         Format for backup output json or transform to csv.
+                        Notice: csv data format can't be restored to DynamoDB.
   -b BUCKET, --bucket BUCKET
                         S3 bucket in which to store or retrieve backups.[must
                         already exist]
